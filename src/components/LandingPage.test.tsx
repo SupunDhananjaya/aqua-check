@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { measures } from '../config/measures.ts';
+import { todayIso } from '../lib/sampleDetails.ts';
 import { inRangeValue } from '../test/sampleValues.ts';
 import LandingPage from './LandingPage.tsx';
 
@@ -28,6 +29,17 @@ function arrivedAtReport() {
 
 const required = measures.filter((measure) => measure.required);
 const optional = measures.filter((measure) => !measure.required);
+
+/**
+ * Fills the identifying details. The date is left alone: it is pre-filled with
+ * today, and a date input cannot be driven with `user.type` — jsdom runs the
+ * value-sanitisation algorithm on every keystroke, so a partial value is
+ * discarded and typing character-by-character ends up empty.
+ */
+async function fillSampleDetails(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByRole('textbox', { name: 'Sample ID' }), 'WW-2026-0417');
+  await user.type(screen.getByRole('textbox', { name: 'Sample name' }), 'Outfall 2 grab');
+}
 
 /** Fills every measure the form insists on, leaving the optional ones blank. */
 async function fillRequired(user: ReturnType<typeof userEvent.setup>) {
@@ -64,8 +76,9 @@ describe('LandingPage', () => {
 
     await user.click(submitButton());
 
-    // One per required field, plus the whole-form "enter at least one" message.
-    expect(screen.getAllByRole('alert')).toHaveLength(required.length + 1);
+    // One per required measure, plus the sample ID and name, plus the
+    // whole-form "enter at least one" message. The date is never blank.
+    expect(screen.getAllByRole('alert')).toHaveLength(required.length + 3);
     expect(arrivedAtReport()).toBeNull();
   });
 
@@ -80,7 +93,8 @@ describe('LandingPage', () => {
     );
     await user.click(submitButton());
 
-    expect(screen.getAllByRole('alert')).toHaveLength(required.length - 1);
+    // The remaining measures, plus the still-blank sample ID and name.
+    expect(screen.getAllByRole('alert')).toHaveLength(required.length + 1);
     expect(arrivedAtReport()).toBeNull();
   });
 
@@ -90,11 +104,11 @@ describe('LandingPage', () => {
     const [first] = measures;
 
     await user.click(submitButton());
-    expect(screen.getAllByRole('alert')).toHaveLength(required.length + 1);
+    expect(screen.getAllByRole('alert')).toHaveLength(required.length + 3);
 
     await user.type(screen.getByRole('spinbutton', { name: first.label }), '7');
 
-    expect(screen.getAllByRole('alert')).toHaveLength(required.length - 1);
+    expect(screen.getAllByRole('alert')).toHaveLength(required.length + 1);
     expect(screen.getByRole('spinbutton', { name: first.label })).toBeValid();
   });
 
@@ -102,6 +116,7 @@ describe('LandingPage', () => {
     const user = userEvent.setup();
     renderLandingPage();
 
+    await fillSampleDetails(user);
     for (const measure of measures) {
       const value =
         measure === measures[0] && measure.approved_upper_bound !== null
@@ -112,6 +127,39 @@ describe('LandingPage', () => {
     await user.click(submitButton());
 
     expect(arrivedAtReport()).toBeInTheDocument();
+  });
+
+  it('defaults the sampling date to today and refuses a later one', () => {
+    renderLandingPage();
+
+    // A date input has no ARIA role, so it is queried by its label instead.
+    const date = screen.getByLabelText('Sampled on');
+    expect(date).toHaveValue(todayIso());
+    expect(date).toHaveAttribute('max', todayIso());
+  });
+
+  it('blocks submission when the sample ID is blank', async () => {
+    const user = userEvent.setup();
+    renderLandingPage();
+
+    await user.type(screen.getByRole('textbox', { name: 'Sample name' }), 'Outfall 2 grab');
+    await fillRequired(user);
+    await user.click(submitButton());
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a sample ID.');
+    expect(arrivedAtReport()).toBeNull();
+  });
+
+  it('blocks submission when the sample name is blank', async () => {
+    const user = userEvent.setup();
+    renderLandingPage();
+
+    await user.type(screen.getByRole('textbox', { name: 'Sample ID' }), 'WW-2026-0417');
+    await fillRequired(user);
+    await user.click(submitButton());
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a sample name.');
+    expect(arrivedAtReport()).toBeNull();
   });
 
   it('marks an optional measure in its description rather than its label', () => {
@@ -127,6 +175,7 @@ describe('LandingPage', () => {
     const user = userEvent.setup();
     renderLandingPage();
 
+    await fillSampleDetails(user);
     await fillRequired(user);
     await user.click(submitButton());
 
@@ -137,6 +186,7 @@ describe('LandingPage', () => {
     const user = userEvent.setup();
     renderLandingPage();
 
+    await fillSampleDetails(user);
     for (const measure of measures) {
       await user.type(
         screen.getByRole('spinbutton', { name: measure.label }),

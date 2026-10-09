@@ -2,6 +2,8 @@ import { Link, Navigate, useLocation } from 'react-router';
 import { formatRange, measures } from '../config/measures.ts';
 import { evaluateSample } from '../lib/evaluateSample.ts';
 import type { MeasureResult, Outcome } from '../lib/evaluateSample.ts';
+import type { SampleDetails } from '../lib/sampleDetails.ts';
+import { formatSampleDate } from '../lib/sampleDetails.ts';
 import { toNumericValues } from '../lib/validateSample.ts';
 
 const OUTCOME_LABEL: Record<Outcome, string> = {
@@ -25,6 +27,35 @@ function readValues(state: unknown): Record<string, number> | null {
   const values = toNumericValues(raw);
 
   return Object.keys(values).length > 0 ? values : null;
+}
+
+/**
+ * Reads the identifying details. Unlike `readValues` this never forces a
+ * redirect: a report with measurements but no metadata is still worth showing,
+ * so anything missing simply renders as a dash.
+ */
+function readSample(state: unknown): SampleDetails {
+  const blank = { id: '', name: '', date: '' };
+  if (typeof state !== 'object' || state === null || !('sample' in state)) return blank;
+
+  const raw = state.sample;
+  if (typeof raw !== 'object' || raw === null) return blank;
+
+  const read = (key: keyof SampleDetails) => {
+    const value = (raw as Record<string, unknown>)[key];
+    return typeof value === 'string' ? value.trim() : '';
+  };
+
+  return { id: read('id'), name: read('name'), date: read('date') };
+}
+
+function SampleDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">{label}</dt>
+      <dd className="mt-0.5 font-medium text-slate-900">{value === '' ? '—' : value}</dd>
+    </div>
+  );
 }
 
 function statusClasses(outcome: Outcome): string {
@@ -58,6 +89,7 @@ function ResultRow({ result }: { result: MeasureResult }) {
 export default function ReportPage() {
   const location = useLocation();
   const values = readValues(location.state);
+  const sample = readSample(location.state);
 
   if (values === null) return <Navigate to="/" replace />;
 
@@ -76,6 +108,16 @@ export default function ReportPage() {
       <h2 id="report-heading" className="text-2xl font-semibold tracking-tight text-slate-900">
         Sample report
       </h2>
+
+      {/* Identify the sample first, then give the verdict. */}
+      <dl className="mt-4 grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-3">
+        <SampleDetail label="Sample ID" value={sample.id} />
+        <SampleDetail label="Sample name" value={sample.name} />
+        <SampleDetail
+          label="Sampled on"
+          value={sample.date === '' ? '' : (formatSampleDate(sample.date) ?? sample.date)}
+        />
+      </dl>
 
       <div
         role="status"

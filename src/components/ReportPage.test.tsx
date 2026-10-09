@@ -5,8 +5,13 @@ import { measures } from '../config/measures.ts';
 import { inRangeSample, outOfRangeValue, requiredOnlySample } from '../test/sampleValues.ts';
 import ReportPage from './ReportPage.tsx';
 
-/** The landing route is stubbed so a redirect away from /report is observable. */
-function renderReport(state?: unknown) {
+const SAMPLE = { id: 'WW-2026-0417', name: 'Outfall 2 grab', date: '2026-10-09' };
+
+/**
+ * The landing route is stubbed so a redirect away from /report is observable.
+ * A sample is supplied by default so every case gets a complete report.
+ */
+function renderReportState(state?: unknown) {
   render(
     <MemoryRouter initialEntries={[{ pathname: '/report', state }]}>
       <Routes>
@@ -15,6 +20,19 @@ function renderReport(state?: unknown) {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+/** Adds the identifying details so individual cases only describe measurements. */
+function renderReport(state?: unknown) {
+  renderReportState(
+    typeof state === 'object' && state !== null ? { sample: SAMPLE, ...state } : state,
+  );
+}
+
+/** The value beside a term in the detail strip, anchored on a role query. */
+function detailValue(label: string) {
+  const term = screen.getAllByRole('term').find((node) => node.textContent === label);
+  return term?.nextElementSibling?.textContent;
 }
 
 function redirectedToForm() {
@@ -155,6 +173,28 @@ describe('ReportPage', () => {
 
     expect(screen.queryByRole('heading', { name: 'Recommended treatment' })).toBeNull();
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+  });
+
+  it('shows the sample id, name and date above the verdict', () => {
+    renderReport({ values: inRangeSample(measures) });
+
+    expect(detailValue('Sample ID')).toBe(SAMPLE.id);
+    expect(detailValue('Sample name')).toBe(SAMPLE.name);
+    expect(detailValue('Sampled on')).toBe('9 October 2026');
+  });
+
+  it('still renders a report that carries no sample details', () => {
+    renderReportState({ values: inRangeSample(measures) });
+
+    expect(redirectedToForm()).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Sample approved');
+    expect(detailValue('Sample ID')).toBe('—');
+  });
+
+  it('falls back to the raw value when the date cannot be read', () => {
+    renderReportState({ values: inRangeSample(measures), sample: { ...SAMPLE, date: 'nonsense' } });
+
+    expect(detailValue('Sampled on')).toBe('nonsense');
   });
 
   it('flags a measure the sample never recorded instead of passing it', () => {

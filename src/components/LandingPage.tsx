@@ -2,8 +2,11 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { configErrors, configPath, measures } from '../config/measures.ts';
+import type { SampleDetails } from '../lib/sampleDetails.ts';
+import { todayIso, validateSampleDetails } from '../lib/sampleDetails.ts';
 import { validateSample } from '../lib/validateSample.ts';
 import MeasureField from './MeasureField.tsx';
+import SampleFields from './SampleFields.tsx';
 
 /** Values are kept as strings so a partial entry such as `-` or `.` survives typing. */
 function blankValues(): Record<string, string> {
@@ -14,6 +17,14 @@ export default function LandingPage() {
   const [values, setValues] = useState<Record<string, string>>(blankValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [details, setDetails] = useState<SampleDetails>(() => ({
+    id: '',
+    name: '',
+    date: todayIso(),
+  }));
+  const [detailErrors, setDetailErrors] = useState<Record<string, string>>({});
+  // Stable across renders so the date picker's limit does not jitter while typing.
+  const [maxDate] = useState(todayIso);
   const navigate = useNavigate();
 
   function handleChange(name: string, next: string) {
@@ -23,17 +34,34 @@ export default function LandingPage() {
     setFormError(null);
   }
 
+  function handleDetailChange(field: keyof SampleDetails, next: string) {
+    setDetails((previous) => ({ ...previous, [field]: next }));
+    setDetailErrors((previous) => (previous[field] ? { ...previous, [field]: '' } : previous));
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    // Re-read today rather than using the mount-time value, so a window left
+    // open across midnight does not start rejecting the current day.
+    const nextDetailErrors = validateSampleDetails(details, todayIso());
     const { fieldErrors, formError: nextFormError } = validateSample(values, measures);
+
+    setDetailErrors(nextDetailErrors);
     setErrors(fieldErrors);
     setFormError(nextFormError);
-    if (Object.keys(fieldErrors).length > 0 || nextFormError !== null) return;
+
+    if (
+      Object.keys(nextDetailErrors).length > 0 ||
+      Object.keys(fieldErrors).length > 0 ||
+      nextFormError !== null
+    ) {
+      return;
+    }
 
     // The report page recomputes from these raw values, so the history entry
     // stays small, serialisable and survives a reload of /report.
-    navigate('/report', { state: { values } });
+    navigate('/report', { state: { values, sample: details } });
   }
 
   return (
@@ -79,30 +107,39 @@ export default function LandingPage() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="mt-6 rounded-xl border border-slate-200 bg-white px-6 py-2 shadow-sm"
+          className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm"
         >
-          {measures.map((measure) => (
-            <MeasureField
-              key={measure.name}
-              measure={measure}
-              value={values[measure.name] ?? ''}
-              error={errors[measure.name] ?? ''}
-              onChange={handleChange}
-            />
-          ))}
+          <SampleFields
+            details={details}
+            errors={detailErrors}
+            maxDate={maxDate}
+            onChange={handleDetailChange}
+          />
 
-          <div className="border-t border-slate-200 py-5">
-            {formError === null ? null : (
-              <p role="alert" className="mb-3 text-sm font-medium text-rose-700">
-                {formError}
-              </p>
-            )}
-            <button
-              type="submit"
-              className="rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white shadow-sm transition hover:bg-sky-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
-            >
-              Check water quality
-            </button>
+          <div className="px-6 py-2">
+            {measures.map((measure) => (
+              <MeasureField
+                key={measure.name}
+                measure={measure}
+                value={values[measure.name] ?? ''}
+                error={errors[measure.name] ?? ''}
+                onChange={handleChange}
+              />
+            ))}
+
+            <div className="border-t border-slate-200 py-5">
+              {formError === null ? null : (
+                <p role="alert" className="mb-3 text-sm font-medium text-rose-700">
+                  {formError}
+                </p>
+              )}
+              <button
+                type="submit"
+                className="rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white shadow-sm transition hover:bg-sky-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
+              >
+                Check water quality
+              </button>
+            </div>
           </div>
         </form>
       )}

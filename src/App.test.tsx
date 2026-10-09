@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import App from './App.tsx';
 import { appName, measures, standard } from './config/measures.ts';
+import { formatSampleDate, todayIso } from './lib/sampleDetails.ts';
 import { inRangeValue, outOfRangeValue } from './test/sampleValues.ts';
 
 function renderApp(path = '/') {
@@ -14,11 +15,17 @@ function renderApp(path = '/') {
   );
 }
 
+const SAMPLE_ID = 'WW-2026-0417';
+const SAMPLE_NAME = 'Outfall 2 grab';
+
 /** Fills the whole form, optionally overriding one measure's value. */
 async function fillForm(
   user: ReturnType<typeof userEvent.setup>,
   overrides: Record<string, number> = {},
 ) {
+  await user.type(screen.getByRole('textbox', { name: 'Sample ID' }), SAMPLE_ID);
+  await user.type(screen.getByRole('textbox', { name: 'Sample name' }), SAMPLE_NAME);
+
   for (const measure of measures) {
     await user.type(
       screen.getByRole('spinbutton', { name: measure.label }),
@@ -70,6 +77,18 @@ describe('App', () => {
     expect(screen.getByRole('listitem')).toHaveTextContent(
       String(first.treatment_if_measure_above_upper_bound),
     );
+  });
+
+  it('carries the sample details through to the report', async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    await fillForm(user);
+
+    const values = screen.getAllByRole('definition').map((node) => node.textContent);
+    expect(values).toContain(SAMPLE_ID);
+    expect(values).toContain(SAMPLE_NAME);
+    expect(values).toContain(formatSampleDate(todayIso()));
   });
 
   it('returns to an empty form from the report', async () => {

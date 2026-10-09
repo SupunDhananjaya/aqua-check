@@ -96,6 +96,41 @@ adding an outcome is a compile error until it is labelled.
 label's text is the input's accessible name and every test queries
 `getByRole('spinbutton', { name: measure.label })`.
 
+## Sample details
+
+Every check records a **sample ID, a sample name and a sampling date**, all three required, and all
+three shown on the report above the verdict. They travel in the router state beside the
+measurements — `{ values, sample }` — which `readValues` ignores, so the two are independent.
+
+**The date is ISO `YYYY-MM-DD` everywhere except the moment it is rendered.** `src/lib/sampleDetails.ts`
+owns the whole of it:
+
+- `todayIso` builds from `getFullYear`/`getMonth`/`getDate`, **never `toISOString()`** — the ISO
+  form is UTC, so west of Greenwich it reports yesterday for much of the day, which would default
+  the form wrongly and reject a same-day sample as being in the future. `now` is injectable so the
+  tests need no fake timers.
+- Future dates are rejected; the past is unbounded. The check is the plain string comparison
+  `date > today`, which is exact for `YYYY-MM-DD` and avoids `Date` arithmetic entirely.
+- `formatSampleDate` renders `9 October 2026` from a fixed month table, not the system locale, so a
+  report reads the same on every machine and the tests stay deterministic. It returns `null` for a
+  day that does not exist, so the report can never print `31 February`.
+- `LandingPage` re-reads `todayIso()` at submit rather than reusing the mount-time value, so a
+  window left open across midnight does not start rejecting the current day.
+
+Two testing constraints, both verified against the installed `aria-query` map:
+
+- **`<input type="date">` has no implicit ARIA role**, so the date field is the one query that uses
+  `getByLabelText('Sampled on')` rather than a role. `type="number"` → `spinbutton` and
+  `text` → `textbox` as usual.
+- **Never drive a date input with `user.type`.** jsdom runs the value-sanitisation algorithm on
+  every keystroke, so a partial value is discarded and typing character-by-character ends up empty.
+  Date-range behaviour is covered in `sampleDetails.test.ts`; the component tests only assert the
+  default value and the `max` attribute. If a DOM test ever must change it, use `fireEvent.change`.
+
+The report's detail strip is a plain `<dl>` — `dt` → `term`, `dd` → `definition`, while `listitem`
+stays `li`-only, so it is role-queryable without an ARIA override and cannot disturb the
+`listitem` assertions that guard the treatment list.
+
 ## Desktop target
 
 `electron/` wraps the same `dist/` the web app ships. **Nothing in `src/` may be made
