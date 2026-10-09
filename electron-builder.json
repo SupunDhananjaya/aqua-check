@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.supundhananjaya.aqua-check",
+  "productName": "aqua-check",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": ["dist/**/*", "electron/**/*", "package.json", "!node_modules/**/*"],
+  "extraResources": [
+    {
+      "from": "src/config/configuration.json",
+      "to": "configuration.default.json"
+    }
+  ],
+  "win": {
+    "target": ["portable"],
+    "icon": "build/icon.ico"
+  },
+  "portable": {
+    "artifactName": "${name}-${version}-portable.${ext}"
+  }
+}

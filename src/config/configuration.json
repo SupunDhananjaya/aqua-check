@@ -1,0 +1,65 @@
+{
+  "standard": "General effluent discharge limits for inland surface water",
+  "measures": [
+    {
+      "name": "ph",
+      "label": "pH",
+      "description": "Acidity or alkalinity of the sample.",
+      "unit": "pH",
+      "approved_lower_bound": 6,
+      "approved_upper_bound": 9,
+      "treatment_if_measure_below_lower_bound": "Dose alkali into the neutralisation tank (hydrated lime or 20% caustic soda), confirm the mixer is running and the pH probe is calibrated, then retest after one full detention time. Trace the acid load upstream - usually an unbuffered acid dump or an over-dosed alum/ferric coagulant.",
+      "treatment_if_measure_above_upper_bound": "Dose dilute sulphuric acid or sparge CO2 into the neutralisation tank and retest after one full detention time. Check for caustic carry-over from a clean-in-place cycle or over-liming at the coagulation stage."
+    },
+    {
+      "name": "bod5",
+      "label": "BOD5",
+      "description": "Biochemical oxygen demand over a 5-day incubation.",
+      "unit": "mg/L",
+      "approved_lower_bound": 0,
+      "approved_upper_bound": 30,
+      "treatment_if_measure_below_lower_bound": "A negative BOD5 is not physically possible. Discard the result, re-check the dilution and the seeded blank, and repeat the 5-day incubation.",
+      "treatment_if_measure_above_upper_bound": "Organic load is breaking through the biological stage. Increase aeration and sludge retention time, check MLSS and the F/M ratio, raise the return activated sludge rate, and look for a shock or hydraulic load upstream. If the overload is routine, add an equalisation buffer or a polishing stage."
+    },
+    {
+      "name": "cod",
+      "label": "COD",
+      "description": "Chemical oxygen demand, including matter the biology cannot digest.",
+      "unit": "mg/L",
+      "approved_lower_bound": 0,
+      "approved_upper_bound": 250,
+      "treatment_if_measure_below_lower_bound": "A negative COD is not physically possible. Re-run the digestion with a fresh blank and verify the potassium dichromate standard.",
+      "treatment_if_measure_above_upper_bound": "Add chemical treatment ahead of the biological stage: dose a coagulant (ferric chloride or alum) with polymer and clarify. For refractory COD that survives the biology, polish with activated carbon or an ozone/Fenton step. Check upstream for a solvent, dye or oil discharge."
+    },
+    {
+      "name": "tss",
+      "label": "Total suspended solids",
+      "description": "Dry weight of particles retained by the filter.",
+      "unit": "mg/L",
+      "approved_lower_bound": 0,
+      "approved_upper_bound": 30,
+      "treatment_if_measure_below_lower_bound": "A negative solids result is not physically possible. Re-dry and re-weigh the filter, and check the balance against a known mass.",
+      "treatment_if_measure_above_upper_bound": "Solids are carrying over the clarifier. Check the sludge blanket level and desludge, re-set the coagulant and polymer dose by jar test, reduce the surface overflow rate, and inspect the weirs and launders for short-circuiting. Add sand or cloth filtration as a final barrier."
+    },
+    {
+      "name": "dissolved_oxygen",
+      "label": "Dissolved oxygen",
+      "description": "Free oxygen available in the sample.",
+      "unit": "mg/L",
+      "approved_lower_bound": 4,
+      "approved_upper_bound": 8,
+      "treatment_if_measure_below_lower_bound": "Increase blower output or diffuser coverage in the aeration basin and clean or replace fouled diffusers. Reduce the organic load reaching the basin. Low dissolved oxygen drives filamentous bulking, so check the sludge volume index once oxygen recovers.",
+      "treatment_if_measure_above_upper_bound": "The basin is over-aerated. Confirm the probe calibration, then trim the dissolved oxygen setpoint or turn the blowers down. Beyond the wasted energy, excess aeration shears the floc and worsens settling."
+    },
+    {
+      "name": "oil_and_grease",
+      "label": "Oil and grease",
+      "description": "Hexane-extractable fats, oils and grease.",
+      "unit": "mg/L",
+      "approved_lower_bound": 0,
+      "approved_upper_bound": 10,
+      "treatment_if_measure_below_lower_bound": "A negative extractable result is not physically possible. Re-extract the sample with fresh solvent and re-weigh the dried flask.",
+      "treatment_if_measure_above_upper_bound": "Skim the grease trap and the dissolved air flotation unit and shorten the skimming interval. Verify the DAF air-to-solids ratio and coagulant dose, and fit an upstream oil-water separator if the load is continuous. Never route skimmings back to the head of works."
+    }
+  ]
+}

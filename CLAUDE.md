@@ -17,10 +17,19 @@ npm run typecheck    # tsc -b --noEmit
 Narrower test runs (no npm script — invoke Vitest directly):
 
 ```bash
-npx vitest run src/components/Counter.test.tsx   # one file
-npx vitest run -t "increments on click"          # one test by name
+npx vitest run src/lib/evaluateSample.test.ts    # one file
+npx vitest run -t "treats both bounds as inclusive"  # one test by name
 npx vitest                                       # watch mode
 npx vitest run --coverage                        # v8 coverage → coverage/
+```
+
+Desktop build (Electron):
+
+```bash
+npm run electron:dev     # Vite + an Electron window on it, hot reload
+npm run electron:start   # build, then run the packaged code path without producing an .exe
+npm run electron:build   # → release/aqua-check-<version>-portable.exe
+npm run make-icon        # regenerate build/icon.ico
 ```
 
 ## Toolchain constraints
@@ -38,9 +47,70 @@ an unsupported compiler. Revisit only once typescript-eslint ships TS 7 support.
 ## Architecture
 
 Standard Vite SPA: `index.html` → `src/main.tsx` (mounts `#root` under `StrictMode`) → `src/App.tsx`.
-Components live in `src/components/`, each with a colocated `*.test.tsx`. There is no router, state
-manager, or data layer yet — this is a fresh scaffold, so pick those when the need appears rather
-than assuming one is already in place.
+Components live in `src/components/`, each with a colocated `*.test.tsx`; pure logic lives in
+`src/lib/`. There is no state manager and no data layer beyond the config file below — pick those
+when the need appears rather than assuming one is already in place.
+
+The app checks a waste-water sample against configured limits. `LandingPage` renders one required
+input per configured measure; on submit it hands the **raw entered strings** to `/report` via
+`navigate(..., { state: { values } })`, and `ReportPage` re-derives the verdict with
+`evaluateSample`. Passing values rather than a computed report keeps the history entry small and
+serialisable, and means a report can never show stale bounds after a config edit.
+
+**Routing uses `react-router` v8 — the package is `react-router`, not `react-router-dom`**, which
+was never published for v8. `BrowserRouter` lives in `src/main.tsx`, deliberately _not_ in `App.tsx`,
+so tests can wrap `<App />` in a `MemoryRouter` without nesting two routers. Note that v8 requires
+Node >= 22.22, and that a static host needs an SPA rewrite to `index.html` or a hard refresh of
+`/report` will 404.
+
+**`src/config/configuration.json` is the rule set, and adding a measure must stay a pure JSON edit.**
+Each entry needs `name` (stable key), `label`, `description`, `unit`, `approved_lower_bound`,
+`approved_upper_bound`, and a treatment string for each bound it sets. A `null` bound means
+unbounded on that side and lets its treatment be `null` too. **Bounds are inclusive** — a value
+exactly on a bound passes. The file is under `src/` on purpose: `tsconfig.app.json` includes only
+`src`, so a root-level config would be invisible to `lint` and `typecheck`. `resolveJsonModule` is
+already implied by `moduleResolution: "bundler"`, so importing it needs no compiler-option change.
+
+`parseMeasures` in `src/config/measures.ts` validates that file at startup and _returns_ problems
+instead of throwing, so a bad hand-edit renders a readable panel rather than a blank screen. Tests
+read `measures` from the real config and derive their values from it, so they stay green when the
+config grows — keep new tests data-driven the same way rather than hard-coding six measures.
+
+## Desktop target
+
+`electron/` wraps the same `dist/` the web app ships. **Nothing in `src/` may be made
+Electron-specific** — the browser build is a first-class target, so both of the tricks below exist
+precisely to avoid changing it.
+
+**The app is served over a custom `app://` scheme, never `file://`.** `electron/main.js` registers
+the scheme as `standard` before `app.whenReady()` and serves `dist/` from `protocol.handle`, with a
+fallback to `index.html` for any extension-less path. That is what lets the absolute `/assets/...`
+paths Vite emits resolve, and gives the page a real origin so `BrowserRouter` can push `/report`.
+It is also why `vite.config.ts` needs no `base` and `src/main.tsx` needs no `HashRouter`. The CSP
+is attached as a response header there rather than as a `<meta>` tag in `index.html`.
+
+**The packaged app reads `configuration.json` from beside the `.exe`.** `electron/preload.cjs` is a
+sandboxed CommonJS preload that fetches it over `ipcRenderer.sendSync` and exposes it as
+`window.__AQUA_CHECK_CONFIG__`. Preloads finish before any page script, so `measures.ts` can prefer
+it over the bundled import and stay synchronous — keep `exposeInMainWorld` at the top level with no
+`await` before it, or that guarantee is lost. `selectConfigSource` falls back to the bundled config
+whenever the global is missing (every browser) or the host reports a read error. Main re-reads the
+file on every load, so reloading the window is the whole edit loop. The seeded copy goes next to the
+executable via `PORTABLE_EXECUTABLE_DIR`, falling back to `userData` if that folder is read-only.
+
+The Electron files are plain `.js`/`.cjs` on purpose: `eslint.config.js` already gives
+`**/*.{js,cjs,mjs}` Node globals, so they lint with no new config, and no `tsconfig.electron.json`
+project reference or `@types/node` is needed. They are **not** covered by `npm run typecheck`.
+
+Two packaging constraints that are easy to undo: `electron-builder.json` must keep
+`directories.output` pointed at `release/` (its default is `dist/`, which would collide with Vite's
+output), and `"!node_modules/**/*"` in `files` is what keeps react and react-router — already
+bundled into `dist/assets` — out of the `.exe`. The archive should stay well under 1 MB; the `.exe`
+is ~95 MB, nearly all Electron runtime.
+
+`npm run electron:dev` waits on `http://localhost:5173`, not `tcp:127.0.0.1:5173` — Vite binds
+`localhost` as IPv6 here, so a TCP probe against the v4 address never resolves and Electron never
+starts.
 
 Four pieces of config carry decisions that are easy to undo by accident:
 
