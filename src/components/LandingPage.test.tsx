@@ -26,6 +26,19 @@ function arrivedAtReport() {
   return screen.queryByRole('heading', { name: 'Sample report' });
 }
 
+const required = measures.filter((measure) => measure.required);
+const optional = measures.filter((measure) => !measure.required);
+
+/** Fills every measure the form insists on, leaving the optional ones blank. */
+async function fillRequired(user: ReturnType<typeof userEvent.setup>) {
+  for (const measure of required) {
+    await user.type(
+      screen.getByRole('spinbutton', { name: measure.label }),
+      String(inRangeValue(measure)),
+    );
+  }
+}
+
 describe('LandingPage', () => {
   it('renders one input per configured measure', () => {
     renderLandingPage();
@@ -51,7 +64,8 @@ describe('LandingPage', () => {
 
     await user.click(submitButton());
 
-    expect(screen.getAllByRole('alert')).toHaveLength(measures.length);
+    // One per required field, plus the whole-form "enter at least one" message.
+    expect(screen.getAllByRole('alert')).toHaveLength(required.length + 1);
     expect(arrivedAtReport()).toBeNull();
   });
 
@@ -66,7 +80,7 @@ describe('LandingPage', () => {
     );
     await user.click(submitButton());
 
-    expect(screen.getAllByRole('alert')).toHaveLength(measures.length - 1);
+    expect(screen.getAllByRole('alert')).toHaveLength(required.length - 1);
     expect(arrivedAtReport()).toBeNull();
   });
 
@@ -76,11 +90,11 @@ describe('LandingPage', () => {
     const [first] = measures;
 
     await user.click(submitButton());
-    expect(screen.getAllByRole('alert')).toHaveLength(measures.length);
+    expect(screen.getAllByRole('alert')).toHaveLength(required.length + 1);
 
     await user.type(screen.getByRole('spinbutton', { name: first.label }), '7');
 
-    expect(screen.getAllByRole('alert')).toHaveLength(measures.length - 1);
+    expect(screen.getAllByRole('alert')).toHaveLength(required.length - 1);
     expect(screen.getByRole('spinbutton', { name: first.label })).toBeValid();
   });
 
@@ -95,6 +109,25 @@ describe('LandingPage', () => {
           : inRangeValue(measure);
       await user.type(screen.getByRole('spinbutton', { name: measure.label }), String(value));
     }
+    await user.click(submitButton());
+
+    expect(arrivedAtReport()).toBeInTheDocument();
+  });
+
+  it('marks an optional measure in its description rather than its label', () => {
+    renderLandingPage();
+    const [measure] = optional;
+
+    // The label must stay exactly the measure name, or the accessible name breaks.
+    const input = screen.getByRole('spinbutton', { name: measure.label });
+    expect(input).toHaveAccessibleDescription(expect.stringContaining('Optional'));
+  });
+
+  it('submits with the optional measures left blank', async () => {
+    const user = userEvent.setup();
+    renderLandingPage();
+
+    await fillRequired(user);
     await user.click(submitButton());
 
     expect(arrivedAtReport()).toBeInTheDocument();

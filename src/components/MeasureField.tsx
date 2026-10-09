@@ -27,6 +27,13 @@ export default function MeasureField({ measure, value, error, onChange }: Measur
           {measure.label}
         </label>
         <span id={rangeId} className="text-sm text-slate-500 tabular-nums">
+          {/* Inside the range span, never the label: the label's text is the
+              input's accessible name, which the tests query by exactly. */}
+          {measure.required ? null : (
+            <span className="mr-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+              Optional
+            </span>
+          )}
           Approved {formatRange(measure)} {measure.unit}
         </span>
       </div>

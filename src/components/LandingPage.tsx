@@ -13,20 +13,23 @@ function blankValues(): Record<string, string> {
 export default function LandingPage() {
   const [values, setValues] = useState<Record<string, string>>(blankValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   function handleChange(name: string, next: string) {
     setValues((previous) => ({ ...previous, [name]: next }));
     // Clear this field's message as soon as it is edited; the rest stay put.
     setErrors((previous) => (previous[name] ? { ...previous, [name]: '' } : previous));
+    setFormError(null);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const nextErrors = validateSample(values, measures);
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    const { fieldErrors, formError: nextFormError } = validateSample(values, measures);
+    setErrors(fieldErrors);
+    setFormError(nextFormError);
+    if (Object.keys(fieldErrors).length > 0 || nextFormError !== null) return;
 
     // The report page recomputes from these raw values, so the history entry
     // stays small, serialisable and survives a reload of /report.
@@ -89,6 +92,11 @@ export default function LandingPage() {
           ))}
 
           <div className="border-t border-slate-200 py-5">
+            {formError === null ? null : (
+              <p role="alert" className="mb-3 text-sm font-medium text-rose-700">
+                {formError}
+              </p>
+            )}
             <button
               type="submit"
               className="rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white shadow-sm transition hover:bg-sky-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"

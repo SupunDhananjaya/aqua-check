@@ -1,4 +1,5 @@
 {
+  "app_name": "AquaCheck",
   "standard": "General effluent discharge limits for inland surface water",
   "measures": [
     {
@@ -6,6 +7,7 @@
       "label": "pH",
       "description": "Acidity or alkalinity of the sample.",
       "unit": "pH",
+      "required": true,
       "approved_lower_bound": 6,
       "approved_upper_bound": 9,
       "treatment_if_measure_below_lower_bound": "Dose alkali into the neutralisation tank (hydrated lime or 20% caustic soda), confirm the mixer is running and the pH probe is calibrated, then retest after one full detention time. Trace the acid load upstream - usually an unbuffered acid dump or an over-dosed alum/ferric coagulant.",
@@ -16,6 +18,7 @@
       "label": "BOD5",
       "description": "Biochemical oxygen demand over a 5-day incubation.",
       "unit": "mg/L",
+      "required": true,
       "approved_lower_bound": 0,
       "approved_upper_bound": 30,
       "treatment_if_measure_below_lower_bound": "A negative BOD5 is not physically possible. Discard the result, re-check the dilution and the seeded blank, and repeat the 5-day incubation.",
@@ -26,6 +29,7 @@
       "label": "COD",
       "description": "Chemical oxygen demand, including matter the biology cannot digest.",
       "unit": "mg/L",
+      "required": true,
       "approved_lower_bound": 0,
       "approved_upper_bound": 250,
       "treatment_if_measure_below_lower_bound": "A negative COD is not physically possible. Re-run the digestion with a fresh blank and verify the potassium dichromate standard.",
@@ -36,6 +40,7 @@
       "label": "Total suspended solids",
       "description": "Dry weight of particles retained by the filter.",
       "unit": "mg/L",
+      "required": true,
       "approved_lower_bound": 0,
       "approved_upper_bound": 30,
       "treatment_if_measure_below_lower_bound": "A negative solids result is not physically possible. Re-dry and re-weigh the filter, and check the balance against a known mass.",
@@ -46,6 +51,7 @@
       "label": "Dissolved oxygen",
       "description": "Free oxygen available in the sample.",
       "unit": "mg/L",
+      "required": true,
       "approved_lower_bound": 4,
       "approved_upper_bound": 8,
       "treatment_if_measure_below_lower_bound": "Increase blower output or diffuser coverage in the aeration basin and clean or replace fouled diffusers. Reduce the organic load reaching the basin. Low dissolved oxygen drives filamentous bulking, so check the sludge volume index once oxygen recovers.",
@@ -56,6 +62,7 @@
       "label": "Oil and grease",
       "description": "Hexane-extractable fats, oils and grease.",
       "unit": "mg/L",
+      "required": false,
       "approved_lower_bound": 0,
       "approved_upper_bound": 10,
       "treatment_if_measure_below_lower_bound": "A negative extractable result is not physically possible. Re-extract the sample with fresh solvent and re-weigh the dried flask.",

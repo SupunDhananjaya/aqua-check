@@ -13,13 +13,22 @@ export type Measure = {
   approved_upper_bound: number | null;
   treatment_if_measure_below_lower_bound: string | null;
   treatment_if_measure_above_upper_bound: string | null;
+  /** `false` lets the operator leave this measure blank. Absent in JSON means `true`. */
+  required: boolean;
 };
 
 export type ParsedConfig = {
+  /** Shown in the header, the document title and the desktop window title. */
+  appName: string;
+  /** The discharge standard these limits come from, shown in the header. */
+  standard: string | null;
   measures: Measure[];
   /** One human-readable line per rejected entry, for display on the landing page. */
   errors: string[];
 };
+
+/** Used when `configuration.json` names no application. */
+const DEFAULT_APP_NAME = 'aqua-check';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -48,12 +57,21 @@ function readBound(value: unknown): { valid: boolean; bound: number | null } {
  * entries are reported in `errors` rather than thrown, so a bad edit shows up as
  * a readable panel instead of a blank screen, and the valid measures still work.
  */
-export function parseMeasures(raw: unknown): ParsedConfig {
+export function parseConfiguration(raw: unknown): ParsedConfig {
   const measures: Measure[] = [];
   const errors: string[] = [];
 
+  // `app_name` and `standard` are optional: absent or blank is a fallback, not a problem.
+  const appName = (isRecord(raw) ? readText(raw.app_name) : null) ?? DEFAULT_APP_NAME;
+  const standard = isRecord(raw) ? readText(raw.standard) : null;
+
   if (!isRecord(raw) || !Array.isArray(raw.measures)) {
-    return { measures, errors: ['configuration.json must be an object with a "measures" array.'] };
+    return {
+      appName,
+      standard,
+      measures,
+      errors: ['configuration.json must be an object with a "measures" array.'],
+    };
   }
 
   const seen = new Set<string>();
@@ -87,6 +105,9 @@ export function parseMeasures(raw: unknown): ParsedConfig {
     if (!label) problems.push('"label" must be a non-empty string');
     if (!unit) problems.push('"unit" must be a non-empty string');
     if (typeof entry.description !== 'string') problems.push('"description" must be a string');
+    if (entry.required !== undefined && typeof entry.required !== 'boolean') {
+      problems.push('"required" must be true or false');
+    }
     if (!lower.valid) problems.push('"approved_lower_bound" must be a finite number or null');
     if (!upper.valid) problems.push('"approved_upper_bound" must be a finite number or null');
     if (lower.bound === null && upper.bound === null) {
@@ -124,10 +145,12 @@ export function parseMeasures(raw: unknown): ParsedConfig {
       approved_upper_bound: upper.bound,
       treatment_if_measure_below_lower_bound: below,
       treatment_if_measure_above_upper_bound: above,
+      // Omitting the field keeps the old behaviour: every measure is mandatory.
+      required: typeof entry.required === 'boolean' ? entry.required : true,
     });
   });
 
-  return { measures, errors };
+  return { appName, standard, measures, errors };
 }
 
 /** The approved range as shown next to an input and in the report. */
@@ -170,7 +193,7 @@ export function selectConfigSource(injected: unknown, bundled: unknown): ConfigS
 
 const injectedConfig = typeof window === 'undefined' ? undefined : window.__AQUA_CHECK_CONFIG__;
 const source = selectConfigSource(injectedConfig, rawConfig);
-const parsed = parseMeasures(source.raw);
+const parsed = parseConfiguration(source.raw);
 
 export const measures: Measure[] = parsed.measures;
 export const configErrors: string[] = source.error
@@ -178,3 +201,5 @@ export const configErrors: string[] = source.error
   : parsed.errors;
 /** The on-disk configuration file, when a desktop host supplied one. */
 export const configPath: string | null = source.path;
+export const appName: string = parsed.appName;
+export const standard: string | null = parsed.standard;

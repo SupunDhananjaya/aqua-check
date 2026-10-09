@@ -25,3 +25,8 @@ export function outOfRangeValue(measure: Measure, side: 'below' | 'above'): numb
 export function inRangeSample(measures: Measure[]): Record<string, number> {
   return Object.fromEntries(measures.map((measure) => [measure.name, inRangeValue(measure)]));
 }
+
+/** An in-range sample with the optional measures left out, as if they were never run. */
+export function requiredOnlySample(measures: Measure[]): Record<string, number> {
+  return inRangeSample(measures.filter((measure) => measure.required));
+}

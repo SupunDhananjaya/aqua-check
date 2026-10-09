@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { measures } from '../config/measures.ts';
-import { inRangeSample, outOfRangeValue } from '../test/sampleValues.ts';
+import { inRangeSample, outOfRangeValue, requiredOnlySample } from '../test/sampleValues.ts';
 import ReportPage from './ReportPage.tsx';
 
 /** The landing route is stubbed so a redirect away from /report is observable. */
@@ -26,6 +26,7 @@ function rowFor(label: string) {
 }
 
 const [first, second] = measures;
+const optional = measures.filter((measure) => !measure.required);
 
 describe('ReportPage', () => {
   it('approves a sample where every measure is in range', () => {
@@ -127,6 +128,33 @@ describe('ReportPage', () => {
     renderReport({ values: 'nope' });
 
     expect(redirectedToForm()).toBeInTheDocument();
+  });
+
+  it('reports an optional measure that was left blank as not checked', () => {
+    renderReport({ values: requiredOnlySample(measures) });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Sample approved');
+    for (const measure of optional) {
+      expect(rowFor(measure.label)).toHaveTextContent('NOT CHECKED');
+    }
+  });
+
+  it('counts the not-checked measures separately from the verdict', () => {
+    renderReport({ values: requiredOnlySample(measures) });
+
+    const checked = measures.length - optional.length;
+    expect(screen.getByRole('status')).toHaveTextContent(
+      `All ${checked} measures are within the approved range.`,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(`${optional.length} measure`);
+    expect(screen.getByRole('status')).toHaveTextContent('not checked');
+  });
+
+  it('recommends no treatment for a measure that was simply not checked', () => {
+    renderReport({ values: requiredOnlySample(measures) });
+
+    expect(screen.queryByRole('heading', { name: 'Recommended treatment' })).toBeNull();
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
   });
 
   it('flags a measure the sample never recorded instead of passing it', () => {

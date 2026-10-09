@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import rawConfig from './configuration.json';
 import {
+  appName,
   configErrors,
   configPath,
   formatRange,
   measures,
-  parseMeasures,
+  parseConfiguration,
   selectConfigSource,
+  standard,
 } from './measures.ts';
 
 type Entry = Record<string, unknown>;
@@ -26,7 +28,7 @@ function entry(overrides: Entry = {}): Entry {
 }
 
 function problemsFor(overrides: Entry): string[] {
-  return parseMeasures({ measures: [entry(overrides)] }).errors;
+  return parseConfiguration({ measures: [entry(overrides)] }).errors;
 }
 
 describe('the shipped configuration.json', () => {
@@ -47,9 +49,9 @@ describe('the shipped configuration.json', () => {
   });
 });
 
-describe('parseMeasures', () => {
+describe('parseConfiguration', () => {
   it('accepts a well-formed entry', () => {
-    const { measures: parsed, errors } = parseMeasures({ measures: [entry()] });
+    const { measures: parsed, errors } = parseConfiguration({ measures: [entry()] });
 
     expect(errors).toEqual([]);
     expect(parsed).toHaveLength(1);
@@ -57,7 +59,7 @@ describe('parseMeasures', () => {
   });
 
   it('accepts a one-sided range', () => {
-    const { measures: parsed, errors } = parseMeasures({
+    const { measures: parsed, errors } = parseConfiguration({
       measures: [
         entry({ approved_lower_bound: null, treatment_if_measure_below_lower_bound: null }),
       ],
@@ -68,12 +70,17 @@ describe('parseMeasures', () => {
   });
 
   it('rejects a config that is not an object with a measures array', () => {
-    expect(parseMeasures(null).errors).toHaveLength(1);
-    expect(parseMeasures({ measures: 'nope' }).errors).toHaveLength(1);
+    expect(parseConfiguration(null).errors).toHaveLength(1);
+    expect(parseConfiguration({ measures: 'nope' }).errors).toHaveLength(1);
   });
 
   it('accepts an empty measures array', () => {
-    expect(parseMeasures({ measures: [] })).toEqual({ measures: [], errors: [] });
+    expect(parseConfiguration({ measures: [] })).toEqual({
+      appName: 'aqua-check',
+      standard: null,
+      measures: [],
+      errors: [],
+    });
   });
 
   it('rejects a missing label', () => {
@@ -114,19 +121,68 @@ describe('parseMeasures', () => {
   });
 
   it('rejects a duplicate name but keeps the first entry', () => {
-    const { measures: parsed, errors } = parseMeasures({ measures: [entry(), entry()] });
+    const { measures: parsed, errors } = parseConfiguration({ measures: [entry(), entry()] });
 
     expect(parsed).toHaveLength(1);
     expect(errors[0]).toContain('duplicate name');
   });
 
   it('ignores unknown keys so config metadata can grow', () => {
-    const { errors } = parseMeasures({
+    const { errors } = parseConfiguration({
       version: 1,
       measures: [entry({ sampling_note: 'grab sample' })],
     });
 
     expect(errors).toEqual([]);
+  });
+});
+
+describe('optional measures', () => {
+  it('treats a measure with no "required" field as mandatory', () => {
+    expect(parseConfiguration({ measures: [entry()] }).measures[0].required).toBe(true);
+  });
+
+  it('keeps an explicit required flag', () => {
+    const { measures: parsed, errors } = parseConfiguration({
+      measures: [entry({ required: false })],
+    });
+
+    expect(errors).toEqual([]);
+    expect(parsed[0].required).toBe(false);
+  });
+
+  it('rejects a required flag that is not a boolean', () => {
+    expect(problemsFor({ required: 'yes' })[0]).toContain('"required" must be true or false');
+  });
+
+  it('marks at least one shipped measure optional and the rest required', () => {
+    expect(measures.filter((measure) => measure.required).length).toBeGreaterThan(0);
+    expect(measures.filter((measure) => !measure.required).length).toBeGreaterThan(0);
+  });
+});
+
+describe('application metadata', () => {
+  it('reads the app name from the configuration', () => {
+    expect(parseConfiguration({ app_name: 'Riverside WWTP', measures: [] }).appName).toBe(
+      'Riverside WWTP',
+    );
+    expect(appName).toBe('AquaCheck');
+  });
+
+  it('falls back to a default name when none is configured', () => {
+    expect(parseConfiguration({ measures: [] }).appName).toBe('aqua-check');
+    expect(parseConfiguration({ app_name: '  ', measures: [] }).appName).toBe('aqua-check');
+  });
+
+  it('still names the app when the whole configuration is unusable', () => {
+    expect(parseConfiguration(null).appName).toBe('aqua-check');
+    expect(parseConfiguration({ app_name: 'Riverside WWTP' }).appName).toBe('Riverside WWTP');
+  });
+
+  it('reads the standard, or null when none is given', () => {
+    expect(parseConfiguration({ standard: 'ISO 1234', measures: [] }).standard).toBe('ISO 1234');
+    expect(parseConfiguration({ measures: [] }).standard).toBeNull();
+    expect(standard).toBeTruthy();
   });
 });
 
@@ -185,16 +241,16 @@ describe('the browser build', () => {
 
 describe('formatRange', () => {
   it('renders a two-sided range', () => {
-    expect(formatRange(parseMeasures({ measures: [entry()] }).measures[0])).toBe('6 – 9');
+    expect(formatRange(parseConfiguration({ measures: [entry()] }).measures[0])).toBe('6 – 9');
   });
 
   it('renders a one-sided range with an inequality', () => {
-    const noLower = parseMeasures({
+    const noLower = parseConfiguration({
       measures: [
         entry({ approved_lower_bound: null, treatment_if_measure_below_lower_bound: null }),
       ],
     }).measures[0];
-    const noUpper = parseMeasures({
+    const noUpper = parseConfiguration({
       measures: [
         entry({ approved_upper_bound: null, treatment_if_measure_above_upper_bound: null }),
       ],

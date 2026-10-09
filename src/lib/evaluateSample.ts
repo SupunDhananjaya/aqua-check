@@ -1,7 +1,13 @@
 import type { Measure } from '../config/measures.ts';
 
-/** Where a value sits relative to its approved range. */
-export type Outcome = 'pass' | 'below' | 'above' | 'missing';
+/**
+ * Where a value sits relative to its approved range.
+ *
+ * `missing` and `skipped` both mean "no value", but they are not the same thing:
+ * `skipped` is an optional measure the operator chose not to run, which is fine;
+ * `missing` is a required one with no value, which should never get past the form.
+ */
+export type Outcome = 'pass' | 'below' | 'above' | 'missing' | 'skipped';
 
 export type MeasureResult = {
   measure: Measure;
@@ -16,8 +22,10 @@ export type SampleReport = {
   passed: boolean;
   /** Every measure, in configuration order. */
   results: MeasureResult[];
-  /** The subset of `results` that did not pass, in configuration order. */
+  /** Did not pass — excludes deliberately skipped measures. In configuration order. */
   failures: MeasureResult[];
+  /** Optional measures the operator left blank, in configuration order. */
+  skipped: MeasureResult[];
 };
 
 /**
@@ -33,9 +41,14 @@ export function evaluateSample(values: Record<string, number>, measures: Measure
   const results = measures.map((measure): MeasureResult => {
     const value = values[measure.name];
 
-    // The form guarantees a value for every measure, so this is a wiring fault
-    // rather than user error. Surface it instead of silently passing.
     if (typeof value !== 'number' || !Number.isFinite(value)) {
+      // An optional measure with no value was simply not run — report it, don't fail it.
+      if (!measure.required) {
+        return { measure, value: null, outcome: 'skipped', treatment: null };
+      }
+
+      // The form guarantees a value for every required measure, so this is a
+      // wiring fault rather than user error. Surface it instead of passing it.
       return {
         measure,
         value: null,
@@ -67,7 +80,12 @@ export function evaluateSample(values: Record<string, number>, measures: Measure
     return { measure, value, outcome: 'pass', treatment: null };
   });
 
-  const failures = results.filter((result) => result.outcome !== 'pass');
+  // Stated as an explicit exclusion rather than `!== 'pass'`: a skipped measure
+  // is not a failure, and a negative filter would silently swallow it.
+  const failures = results.filter(
+    (result) => result.outcome !== 'pass' && result.outcome !== 'skipped',
+  );
+  const skipped = results.filter((result) => result.outcome === 'skipped');
 
-  return { passed: failures.length === 0, results, failures };
+  return { passed: failures.length === 0, results, failures, skipped };
 }

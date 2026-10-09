@@ -1,11 +1,16 @@
 import type { Measure } from '../config/measures.ts';
 
+export type SampleValidation = {
+  /** One message per offending measure, keyed by `measure.name`. */
+  fieldErrors: Record<string, string>;
+  /** A problem with the sample as a whole, such as nothing being entered at all. */
+  formError: string | null;
+};
+
 /**
- * Checks that every measure has a value and that each one reads as a number.
- *
- * Returns one message per offending measure, keyed by `measure.name`; an empty
- * object means the sample is ready to score. Range checking is deliberately not
- * done here — that is the report's job.
+ * Checks that every required measure has a value and that each entry reads as a
+ * number. No problems means the sample is ready to score; range checking is
+ * deliberately not done here — that is the report's job.
  *
  * Kept out of the form component so it can be tested without a DOM: an
  * `<input type="number">` sanitises unparseable keystrokes to `''`, so the
@@ -15,25 +20,36 @@ import type { Measure } from '../config/measures.ts';
 export function validateSample(
   values: Record<string, string>,
   measures: Measure[],
-): Record<string, string> {
-  const errors: Record<string, string> = {};
+): SampleValidation {
+  const fieldErrors: Record<string, string> = {};
+  let anyValue = false;
 
   for (const measure of measures) {
     const raw = (values[measure.name] ?? '').trim();
 
     if (raw === '') {
-      errors[measure.name] = `Enter a value for ${measure.label}.`;
+      // An optional measure the operator did not run is not an error.
+      if (measure.required) fieldErrors[measure.name] = `Enter a value for ${measure.label}.`;
       continue;
     }
+
+    anyValue = true;
 
     // `Number('')` is 0, which is why the blank check has to come first.
     const numeric = Number(raw);
     if (!Number.isFinite(numeric) || !/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(raw)) {
-      errors[measure.name] = `Enter ${measure.label} as a number.`;
+      fieldErrors[measure.name] = `Enter ${measure.label} as a number.`;
     }
   }
 
-  return errors;
+  // Without this, a config where everything is optional would let an empty form
+  // through and report "Sample approved" for a sample nobody measured.
+  const formError =
+    !anyValue && measures.length > 0
+      ? 'Enter at least one measurement before checking the sample.'
+      : null;
+
+  return { fieldErrors, formError };
 }
 
 /**

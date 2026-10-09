@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import App from './App.tsx';
-import { measures } from './config/measures.ts';
+import { appName, measures, standard } from './config/measures.ts';
 import { inRangeValue, outOfRangeValue } from './test/sampleValues.ts';
 
 function renderApp(path = '/') {
@@ -33,6 +33,13 @@ describe('App', () => {
     renderApp();
 
     expect(screen.getByRole('heading', { name: 'New water sample' })).toBeInTheDocument();
+  });
+
+  it('takes its name and standard from the configuration', () => {
+    renderApp();
+
+    expect(screen.getByRole('heading', { level: 1, name: appName })).toBeInTheDocument();
+    expect(screen.getByRole('banner')).toHaveTextContent(String(standard));
   });
 
   it('sends an unknown route back to the form', () => {

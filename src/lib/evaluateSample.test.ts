@@ -11,6 +11,7 @@ function makeMeasure(overrides: Partial<Measure> & { name: string }): Measure {
     approved_upper_bound: 10,
     treatment_if_measure_below_lower_bound: 'Raise it.',
     treatment_if_measure_above_upper_bound: 'Lower it.',
+    required: true,
     ...overrides,
   };
 }
@@ -84,6 +85,27 @@ describe('evaluateSample', () => {
     expect(report.failures[0].outcome).toBe('missing');
     expect(report.failures[0].value).toBeNull();
     expect(report.failures[0].treatment).toContain('COD');
+  });
+
+  it('skips an optional measure that was left blank instead of failing it', () => {
+    const optional = makeMeasure({ name: 'oil', label: 'Oil and grease', required: false });
+    const report = evaluateSample({ ph: 7 }, [ph, optional]);
+
+    expect(report.passed).toBe(true);
+    expect(report.failures).toEqual([]);
+    expect(report.skipped.map((result) => result.measure.name)).toEqual(['oil']);
+    expect(report.results[1].outcome).toBe('skipped');
+    expect(report.results[1].value).toBeNull();
+    expect(report.results[1].treatment).toBeNull();
+  });
+
+  it('still scores an optional measure that was given a value', () => {
+    const optional = makeMeasure({ name: 'oil', required: false });
+    const report = evaluateSample({ ph: 7, oil: 99 }, [ph, optional]);
+
+    expect(report.passed).toBe(false);
+    expect(report.skipped).toEqual([]);
+    expect(report.failures[0].outcome).toBe('above');
   });
 
   it('passes vacuously when there are no measures', () => {

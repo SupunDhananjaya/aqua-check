@@ -71,10 +71,30 @@ exactly on a bound passes. The file is under `src/` on purpose: `tsconfig.app.js
 `src`, so a root-level config would be invisible to `lint` and `typecheck`. `resolveJsonModule` is
 already implied by `moduleResolution: "bundler"`, so importing it needs no compiler-option change.
 
-`parseMeasures` in `src/config/measures.ts` validates that file at startup and _returns_ problems
-instead of throwing, so a bad hand-edit renders a readable panel rather than a blank screen. Tests
-read `measures` from the real config and derive their values from it, so they stay green when the
-config grows — keep new tests data-driven the same way rather than hard-coding six measures.
+Two fields are optional and **default rather than error**, so an older config still loads:
+`required` on a measure (absent means `true`) and the top-level `app_name` (absent means
+`aqua-check`). The top-level `standard` is displayed in the header. `app_name` drives the header,
+the document title and the desktop window title — nothing should hard-code the product name in
+`src/` again.
+
+`parseConfiguration` in `src/config/measures.ts` validates that file at startup and _returns_
+problems instead of throwing, so a bad hand-edit renders a readable panel rather than a blank
+screen. It must keep producing an `appName` even when the file is unusable, or a broken config
+leaves the header blank. Tests read `measures` from the real config and derive their values from it,
+so they stay green when the config grows — keep new tests data-driven the same way rather than
+hard-coding six measures, and derive required-field counts from `measure.required` rather than from
+`measures.length`.
+
+**An optional measure left blank is `'skipped'`, not a failure.** `evaluateSample` splits the
+no-value case on `measure.required`: optional gives `'skipped'`, required keeps `'missing'` (which
+the form should never allow through). `failures` therefore excludes **both** `'pass'` and
+`'skipped'` explicitly — it used to be the negative filter `!== 'pass'`, which would silently count
+a skipped measure as a failure. `OUTCOME_LABEL` in `ReportPage` is a `Record<Outcome, string>`, so
+adding an outcome is a compile error until it is labelled.
+
+`MeasureField` shows the `Optional` marker inside the **range span**, never the `<label>`: the
+label's text is the input's accessible name and every test queries
+`getByRole('spinbutton', { name: measure.label })`.
 
 ## Desktop target
 

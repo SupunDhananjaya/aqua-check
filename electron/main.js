@@ -14,6 +14,9 @@ const DEV_SERVER_URL = 'http://localhost:5173';
 const APP_SCHEME = 'app';
 const APP_ORIGIN = `${APP_SCHEME}://aqua-check`;
 
+/** Used until the page sets its own title, and whenever the config names nothing. */
+const DEFAULT_APP_NAME = 'aqua-check';
+
 const DIST_DIR = join(import.meta.dirname, '..', 'dist');
 const CONFIG_FILENAME = 'configuration.json';
 
@@ -112,6 +115,17 @@ function readConfig() {
   }
 }
 
+/**
+ * The configured application name, used for the window title so it is right from
+ * the first frame rather than flashing the static title out of index.html until
+ * React mounts and sets `document.title`.
+ */
+function configuredAppName() {
+  const config = readConfig();
+  const name = config?.raw?.app_name;
+  return typeof name === 'string' && name.trim() !== '' ? name : DEFAULT_APP_NAME;
+}
+
 // ---------------------------------------------------------------------------
 // Serving the built app
 // ---------------------------------------------------------------------------
@@ -149,6 +163,7 @@ function handleAppRequest(request) {
 
 function createWindow() {
   const window = new BrowserWindow({
+    title: configuredAppName(),
     width: 1100,
     height: 860,
     minWidth: 420,

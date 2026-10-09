@@ -9,6 +9,7 @@ const OUTCOME_LABEL: Record<Outcome, string> = {
   below: 'BELOW RANGE',
   above: 'ABOVE RANGE',
   missing: 'NOT RECORDED',
+  skipped: 'NOT CHECKED',
 };
 
 /**
@@ -27,7 +28,10 @@ function readValues(state: unknown): Record<string, number> | null {
 }
 
 function statusClasses(outcome: Outcome): string {
-  return outcome === 'pass' ? 'text-emerald-700' : 'text-rose-700';
+  if (outcome === 'pass') return 'text-emerald-700';
+  // A measure nobody ran is not a problem, so it must not be coloured like one.
+  if (outcome === 'skipped') return 'text-slate-500';
+  return 'text-rose-700';
 }
 
 function ResultRow({ result }: { result: MeasureResult }) {
@@ -57,7 +61,15 @@ export default function ReportPage() {
 
   if (values === null) return <Navigate to="/" replace />;
 
-  const { passed, results, failures } = evaluateSample(values, measures);
+  const { passed, results, failures, skipped } = evaluateSample(values, measures);
+  const checked = results.length - skipped.length;
+
+  const verdict =
+    checked === 0
+      ? 'No measures were checked.'
+      : passed
+        ? `All ${checked} measures are within the approved range.`
+        : `${failures.length} of ${checked} measures are outside the approved range.`;
 
   return (
     <section aria-labelledby="report-heading">
@@ -75,9 +87,10 @@ export default function ReportPage() {
           {passed ? 'Sample approved' : 'Sample not approved'}
         </p>
         <p className={`mt-1 text-sm ${passed ? 'text-emerald-800' : 'text-rose-800'}`}>
-          {passed
-            ? `All ${results.length} measures are within the approved range.`
-            : `${failures.length} of ${results.length} measures are outside the approved range.`}
+          {verdict}
+          {skipped.length > 0
+            ? ` ${skipped.length} ${skipped.length === 1 ? 'measure was' : 'measures were'} not checked.`
+            : ''}
         </p>
       </div>
 
