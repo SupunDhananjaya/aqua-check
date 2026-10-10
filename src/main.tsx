@@ -9,7 +9,11 @@ if (!rootElement) throw new Error('Root element #root not found');
 
 createRoot(rootElement).render(
   <StrictMode>
-    <BrowserRouter>
+    {/*
+      The basename tracks the Vite `base`, so one build-time knob serves both
+      targets: `/` for dev, tests and Electron, `/aqua-check/` for GitHub Pages.
+    */}
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <App />
     </BrowserRouter>
   </StrictMode>,

@@ -1,0 +1,64 @@
+# Builds the browser target and publishes it to GitHub Pages.
+#
+# Pages serves this repository from the sub-path /aqua-check/, so the site is
+# built with `build:pages` rather than `build` — that script is the only place
+# the sub-path appears, which keeps the Electron target on a `/` base.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # react-router v8 requires Node >= 22.22, so pin rather than inherit the
+      # runner default.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: npm run build:pages
+
+      # SPA fallback: Pages has no rewrite rule, so a hard refresh of /report
+      # would 404. This must be a copy of the built index.html, not a file in
+      # public/, because it needs the build's hashed asset tags.
+      - name: Add SPA fallback
+        run: cp dist/index.html dist/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

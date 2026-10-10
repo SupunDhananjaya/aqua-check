@@ -7,7 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run dev          # Vite dev server on http://localhost:5173
 npm run build        # tsc -b && vite build  → dist/
+npm run build:pages  # same, with the GitHub Pages base path
 npm run preview      # serve the built dist/ locally
+npm run preview:pages  # serve it on the GitHub Pages base path
 npm run lint         # eslint .
 npm run format       # prettier --write .
 npm test             # vitest run (single pass, no watch)
@@ -166,6 +168,38 @@ is ~95 MB, nearly all Electron runtime.
 `npm run electron:dev` waits on `http://localhost:5173`, not `tcp:127.0.0.1:5173` — Vite binds
 `localhost` as IPv6 here, so a TCP probe against the v4 address never resolves and Electron never
 starts.
+
+## Web deployment
+
+The browser build is published to GitHub Pages at `https://supundhananjaya.github.io/aqua-check/`
+by `.github/workflows/deploy.yml` on every push to `main` (Pages **Source** must stay set to
+_GitHub Actions_ in the repository settings; there is no `gh-pages` branch and no `gh-pages`
+dependency, which also sidesteps `dist` being gitignored).
+
+**The Pages sub-path lives in the `build:pages` script and nowhere else.** That script is
+`build` plus `vite build --base=/aqua-check/`, and `src/main.tsx` reads the value back as
+`basename={import.meta.env.BASE_URL}`. One knob therefore serves both targets and nothing in `src/`
+becomes deployment-specific. Two reasons not to "tidy" this into `vite.config.ts`:
+
+- An unconditional `base` breaks the desktop app. `handleAppRequest` in `electron/main.js` maps the
+  request pathname straight onto `dist/` with no prefix stripping, so `/aqua-check/assets/...`
+  resolves to `dist/aqua-check/assets/...`, 404s, and the window comes up blank.
+- A conditional `base` keyed off `process.env` does not typecheck. `vite.config.ts` is covered by
+  `tsconfig.node.json` and there is deliberately no `@types/node`, so `process` is not declared.
+
+The workflow copies `dist/index.html` to `dist/404.html` after the build, because Pages has no SPA
+rewrite and a hard refresh of `/report` would otherwise 404. It has to be a post-build copy rather
+than a `public/404.html`, since the file needs the build's hashed asset tags. A cold deep link to
+`/report` then loads the app and bounces to `/` via `ReportPage`, which is already how an
+unreachable report behaves. No `.nojekyll` is needed: Jekyll never runs when Pages is sourced from
+Actions.
+
+The workflow pins Node 24 — react-router v8 needs `>= 22.22`, so the runner default is not safe to
+assume — and runs `lint` and `test` before the build, so a broken commit never publishes.
+
+On Pages the rule set is **frozen at build time**: `measures.ts` imports `configuration.json`, and
+`window.__AQUA_CHECK_CONFIG__` is only ever set by the Electron preload, so a limits change needs a
+push and a redeploy. Only the packaged `.exe` reads the file from beside itself.
 
 Four pieces of config carry decisions that are easy to undo by accident:
 

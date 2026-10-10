@@ -50,7 +50,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:pages": "tsc -b && vite build --base=/aqua-check/",
     "preview": "vite preview",
+    "preview:pages": "vite preview --base=/aqua-check/",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
