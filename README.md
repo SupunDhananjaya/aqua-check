@@ -1,6 +1,6 @@
 # aqua-check
 
-Check a waste-water sample against configurable discharge limits.
+Check a waste-water sample against configurable discharge limits .
 
 Enter a sample ID, a sample name and a sampling date, then one reading per configured measure.
 The report states whether the sample passes, and for every measure outside its approved bounds it
